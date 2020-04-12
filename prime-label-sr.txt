@@ -1,0 +1,75 @@
+Area    : Segment Routing using MPLS labels.
+
+Idea ## : Translating SR Labels to a fixed number of Labels for convenience 
+          THUS limiting the total number of SR-Labels.
+
+- If there exist multiple labels in an SR explicit path, then one could map them
+to Prime numbers (with each of the labels mapping to a certain prime number closest
+to it) and this mapping could be universal across routers. Now label A could map to
+prime number x1 and label b to x2. Now the presence of both these labels could be
+signified by multiplying x1 * x2 and the result stored in a set of labels (5 of them) which
+could have a span of 100 bits to store the prime-product. When these labels are sent to 
+any router it factorizes the primes in the 100 bit product and figures out which is the 
+next hop to send the packet to and then removes that factor from the prime set and
+recomputes a new prime-product based on the X-1 labels where X was the number of
+labels that entered the router.
+
+Intra-AS and inter-AS schemes for prime products.
+
+- Intra-AS could be easily achieved as all routers within the vicinity could share
+the same mappings between their labels they use in SR to a prime number set which are
+globally only 2**20 in number.
+
+- Inter-AS could be easily achieved as all routers in whatever AS they are in share the
+same 3 to 2**20 space. Once this is the restricted space, the resultant product of say
+a maximum of 20 labels could be mapped into a prime product range that could be represented
+with say a maximum of 5 labels so 5 * 20 = 100 bits and not anything more.
+
+- Every router has to have the following logic :
+
+If (router sees an MPLS packet with first label as 10011)
+then
+	Assume that the labels in the following stack in the packet
+	are a prime-product version of an SR MPLS label list;
+
+	Use factorization to break down the prime-product carried in the
+	label stack into its constituent labels;
+
+	Use the primes in their respective ranges to map it to their
+	prime range;
+
+	Lookup the prime into their plain-label table;
+
+	Use the said plain-label looked up to punt to next hop;
+
+	Use the rest of the labels to form a new prime-product of N-1 labels
+	where N was the list of labels before the lookup operation;
+
+	Map the prime product into the required set of labels in the new
+	label stack;
+
+	Forward the packet to the next-hop;
+
+ifend
+
+Explained with an Example :
+
+a) Label 20001 mapped to PN = 5
+b) Label 30001 mapped to PN = 7
+c) Label 40001 mapped to PN = 11
+
+Now the product of 5 * 7 * 11 = 385
+
+Using just one label the router A sends out a packet with 385. Now the label 10011
+is followed by label A where label = 385. The first router that receives it factorizes
+385 and finds the primes 5,7,11 in the factors decomposed. If none of the label-space of the 
+router is mapped to this list of primes then it just forwards the packet to the router whose
+label is referred to by the prime in the list of factors. The intended next hop then receives
+the packet and factorizes to the list of primes and finds one of the primes belonging to 
+its label-space. It then looks up to find the next hop referred to by the next label
+and then drops its own from the prime product and then multiplies with the remaining
+set of labels to get a new prime-product which it places on the packet and sends it along
+to the next hop.
+
+So in this case at Router A the prime-product becomes 77 and then at router B the 
+prime-product becomes just 11 and so on.
